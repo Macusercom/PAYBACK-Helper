@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>PAYBACK Helper</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="pb-header">
+    <span class="pb-logo">°P</span>
+    <span class="pb-title">PAYBACK Helper</span>
+  </div>
+  <div id="points-display" class="points-display" style="display:none;"></div>
+
+  <!-- Loading -->
+  <div id="view-loading" class="view">
+    <div class="empty-state">Wird geladen…</div>
+  </div>
+
+  <!-- No data stored yet -->
+  <div id="view-no-data" class="view hidden">
+    <div class="empty-state">
+      <div class="empty-icon">°P</div>
+      <p>Noch keine PAYBACK Daten gespeichert.</p>
+      <p class="hint">Daten werden im Hintergrund geladen. Falls eCoupons fehlen, bitte zuerst auf <a href="https://www.payback.at/coupons" target="_blank" style="color:#0046AA;font-weight:bold;">payback.at einloggen</a>.</p>
+      <div class="footer-actions" style="margin-top:12px;">
+        <button class="btn-refresh" title="Shops + eCoupons im Hintergrund aktualisieren">↺ Jetzt laden</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- No match for current site -->
+  <div id="view-no-match" class="view hidden">
+    <div class="empty-state">
+      <div class="empty-icon">°P</div>
+      <p>Kein PAYBACK Partner erkannt.</p>
+    </div>
+    <div class="data-footer" id="footer-no-match"></div>
+  </div>
+
+  <!-- Shop match -->
+  <div id="view-match" class="view hidden">
+    <div class="shop-card">
+      <div class="shop-info">
+        <div class="shop-name" id="shop-name"></div>
+        <div class="shop-points" id="shop-points"></div>
+      </div>
+      <a class="btn-primary" id="shop-link" href="#" target="_blank">Über PAYBACK kaufen →</a>
+    </div>
+
+    <div id="coupons-section"></div>
+
+    <div class="data-footer" id="footer-match"></div>
+  </div>
+
+  <!-- domain-map.js must load before popup.js (provides PAYBACK_DOMAIN_LOOKUP + normalizeName) -->
+  <script src="domain-map.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

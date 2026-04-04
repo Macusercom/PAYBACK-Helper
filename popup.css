@@ -1,0 +1,315 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 320px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  color: #222;
+  background: #f5f7fa;
+}
+
+.pb-header {
+  background: #0046AA;
+  color: white;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pb-logo {
+  font-size: 20px;
+  font-weight: bold;
+  letter-spacing: -1px;
+}
+
+.pb-title {
+  font-size: 15px;
+  font-weight: bold;
+}
+
+/* Points balance bar */
+.points-display {
+  background: #003580;
+  color: #fff;
+  text-align: center;
+  font-size: 13px;
+  font-weight: bold;
+  padding: 6px 14px;
+  letter-spacing: 0.3px;
+}
+
+/* Views */
+.view { display: block; }
+.hidden { display: none; }
+
+/* Empty / no-match state */
+.empty-state {
+  padding: 24px 16px;
+  text-align: center;
+  color: #555;
+}
+
+.empty-icon {
+  font-size: 36px;
+  font-weight: bold;
+  color: #0046AA;
+  opacity: 0.3;
+  margin-bottom: 10px;
+}
+
+.empty-state p {
+  margin: 6px 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.hint {
+  color: #888;
+  font-size: 12px !important;
+  margin-top: 12px !important;
+}
+
+.update-links {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.btn-update {
+  background: #0046AA;
+  color: white;
+  padding: 7px 12px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.btn-update:hover { background: #003080; }
+
+/* Shop card */
+.shop-card {
+  background: white;
+  margin: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.shop-info {
+  margin-bottom: 10px;
+}
+
+.shop-name {
+  font-size: 16px;
+  font-weight: bold;
+  color: #0046AA;
+}
+
+.shop-points {
+  font-size: 13px;
+  color: #555;
+  margin-top: 2px;
+}
+
+.btn-primary {
+  display: block;
+  text-align: center;
+  background: #0046AA;
+  color: white;
+  padding: 9px 14px;
+  border-radius: 7px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.btn-primary:hover { background: #003080; }
+
+/* Coupon cards */
+.coupons-header {
+  padding: 4px 10px 6px;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+}
+
+.coupon-card {
+  margin: 0 10px 8px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1.5px solid;
+}
+
+.coupon-card.unactivated {
+  background: #FFF3E0;
+  border-color: #E87722;
+}
+
+.coupon-card.activated {
+  background: #E8F5E9;
+  border-color: #2E7D32;
+}
+
+.coupon-card.expired {
+  background: #f5f5f5;
+  border-color: #bbb;
+  opacity: 0.75;
+}
+
+.coupon-headline {
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.coupon-card.unactivated .coupon-headline { color: #E87722; }
+.coupon-card.activated .coupon-headline { color: #2E7D32; }
+.coupon-card.expired .coupon-headline { color: #888; }
+
+.coupon-subline {
+  font-size: 12px;
+  color: #444;
+  margin-top: 3px;
+  line-height: 1.4;
+}
+
+.coupon-validity {
+  font-size: 11px;
+  color: #999;
+  margin-top: 5px;
+}
+
+.btn-activate {
+  display: inline-block;
+  margin-top: 8px;
+  background: #E87722;
+  color: white;
+  padding: 5px 12px;
+  border-radius: 5px;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.btn-activate:hover { background: #c4621a; }
+
+.coupon-activated-badge {
+  font-size: 11px;
+  color: #2E7D32;
+  font-weight: bold;
+  margin-top: 5px;
+}
+
+.coupon-expired-note {
+  font-size: 11px;
+  color: #999;
+  margin-top: 5px;
+}
+
+.no-coupons-note {
+  margin: 0 10px 10px;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #888;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* Footer */
+.data-footer {
+  padding: 6px 12px 10px;
+  border-top: 1px solid #eee;
+  margin-top: 4px;
+}
+
+.footer-timestamps {
+  font-size: 11px;
+  color: #aaa;
+  text-align: center;
+  margin-bottom: 5px;
+}
+
+.footer-timestamps.stale {
+  color: #E87722;
+}
+
+.footer-timestamps .warn {
+  color: #E87722;
+}
+
+.footer-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.footer-actions a,
+.footer-actions .btn-refresh {
+  display: inline-block;
+  background: #f0f4ff;
+  color: #0046AA;
+  border: 1px solid #c0d0f0;
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: bold;
+  text-decoration: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.footer-actions a:hover,
+.footer-actions .btn-refresh:hover {
+  background: #0046AA;
+  color: white;
+}
+
+.footer-actions .btn-refresh:disabled {
+  opacity: 0.6;
+  cursor: default;
+  background: #f0f4ff;
+  color: #0046AA;
+}
+
+/* Overlay toggle in footer */
+.overlay-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  justify-content: center;
+  padding: 6px 12px 10px;
+  font-size: 11px;
+  color: #666;
+  cursor: pointer;
+  user-select: none;
+}
+
+.overlay-toggle input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: #0046AA;
+  cursor: pointer;
+  margin: 0;
+}
+
+.login-warning {
+  font-size: 11px;
+  color: #E87722;
+  text-align: center;
+  padding: 4px 12px 8px;
+}
+
+.login-warning a {
+  color: #E87722;
+  font-weight: bold;
+}
