@@ -5,13 +5,13 @@ A Chrome Extension that shows your link for PAYBACK points as well as eCoupons f
 
 
 ## Features
-- Shows the **°P points** for the current shop when you visit a PAYBACK partner website
-- Shows your **eCoupons** (activated and not yet activated) for that shop
-- **Overlay widget** on partner websites with a one-click link to purchase via PAYBACK
-- Warns you about **unactivated eCoupons** before you shop
+- Shows the °P points for the current shop when you visit a PAYBACK partner website
+- Shows your eCoupons (activated and not yet activated) for that shop
+- Overlay widget on partner websites with a one-click link to purchase via PAYBACK
+- Warns you about unactivated eCoupons before you shop
 - Auto-redirects to the PAYBACK affiliate URL when clicking "Über PAYBACK kaufen"
-- Displays your current **°Punkte balance** in the popup
-- **Refresh button** to update shops and coupons in the background
+- Displays your current °Punkte balance in the popup
+- Refresh button to update shops and coupons in the background
 
 
 ## How To Install (Chrome)
