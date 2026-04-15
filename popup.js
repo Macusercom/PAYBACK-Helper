@@ -7,10 +7,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const {
     shops = [], coupons = [],
     shopsLastFetch, couponsLastFetch, couponsLoggedIn,
-    pointsBalance, pointsLastFetch,
+    pointsBalance,
   } = await chrome.storage.local.get([
     'shops', 'coupons', 'shopsLastFetch', 'couponsLastFetch', 'couponsLoggedIn',
-    'pointsBalance', 'pointsLastFetch',
+    'pointsBalance',
   ]);
 
   // Show points balance in header if available
@@ -88,7 +88,7 @@ function matchShop(hostname, shops) {
 
 // ---- Render coupons ----
 
-function renderCoupons(coupons, shop, couponsLoggedIn) {
+function renderCoupons(coupons, _shop, couponsLoggedIn) {
   const section = document.getElementById('coupons-section');
 
   if (couponsLoggedIn === false) {
@@ -111,6 +111,13 @@ function renderCoupons(coupons, shop, couponsLoggedIn) {
 
   if (unactivated.length > 0) {
     html += `<div class="coupons-header">⚠ Nicht aktivierte eCoupons</div>`;
+    // "Alle aktivieren" Button – Background öffnet payback.at/coupons und aktiviert dort
+    const activatable = unactivated.filter(c => !c.validTo || new Date(c.validTo).getTime() > Date.now());
+    if (activatable.length > 0) {
+      html += `<button class="btn-activate-all" id="btn-activate-all">
+        ⚡ Alle ${activatable.length > 1 ? activatable.length + ' eCoupons' : 'eCoupons'} automatisch aktivieren
+      </button>`;
+    }
     unactivated.forEach(c => { html += buildCouponCard(c, 'unactivated'); });
   }
   if (activated.length > 0) {
@@ -119,6 +126,20 @@ function renderCoupons(coupons, shop, couponsLoggedIn) {
   }
 
   section.innerHTML = html;
+
+  // Event-Listener für "Alle aktivieren" Button
+  const activateAllBtn = document.getElementById('btn-activate-all');
+  if (activateAllBtn) {
+    activateAllBtn.addEventListener('click', () => {
+      const toActivate = unactivated
+        .filter(c => !c.validTo || new Date(c.validTo).getTime() > Date.now())
+        .map(c => ({ couponId: c.couponID, partnerShortName: c.partnerShortName }));
+      if (toActivate.length === 0) return;
+      chrome.runtime.sendMessage({ type: 'ACTIVATE_ALL_COUPONS', coupons: toActivate });
+      activateAllBtn.textContent = '⚡ Wird aktiviert…';
+      activateAllBtn.disabled = true;
+    });
+  }
 }
 
 function buildCouponCard(coupon, type) {
@@ -191,6 +212,7 @@ function setupRefreshButton() {
       // Open pages directly from popup – no message passing to background needed.
       // Content scripts extract data → send to background → storage updates → popup reloads.
       chrome.tabs.create({ url: 'https://www.payback.at/online-punkten/alle-shops', active: false });
+      chrome.tabs.create({ url: 'https://www.payback.at/online-punkten', active: false });
       chrome.tabs.create({ url: 'https://www.payback.at/coupons', active: false });
     });
   });
@@ -211,7 +233,7 @@ function setupOverlayToggle() {
 // Listen for storage changes to update the popup live after refresh
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
-  if (changes.shopsLastFetch || changes.couponsLastFetch || changes.couponsLoggedIn) {
+  if (changes.shopsLastFetch || changes.couponsLastFetch || changes.couponsLoggedIn || changes.coupons) {
     // Reload the entire popup to show fresh data
     window.location.reload();
   }

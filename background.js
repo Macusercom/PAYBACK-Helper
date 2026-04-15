@@ -11,6 +11,9 @@ const STALE_MS = 24 * 60 * 60 * 1000; // 24 hours
 // Tab IDs opened for background refresh – close them once data arrives.
 // Persisted to session storage so they survive service worker restarts.
 let refreshTabIds = new Set();
+// Tab IDs opened speziell für Hintergrund-Aktivierung – NICHT schließen bis
+// PENDING_ACTIVATIONS_DONE empfangen, damit async fetch() Requests abgeschlossen werden.
+let activationTabIds = new Set();
 // Prevent multiple simultaneous refreshes (cooldown: 60 seconds)
 // Persisted via chrome.storage.session so it survives restarts.
 let _lastRefreshTime = 0;
@@ -40,6 +43,7 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
 
 const ALARM_COUPONS = 'refresh-coupons';
 const ALARM_CLEANUP_PREFIX = 'cleanup-tab-';
+const ALARM_ACTIVATION_PREFIX = 'activation-tab-';
 
 function refreshInBackground() {
   const now = Date.now();
@@ -51,8 +55,11 @@ function refreshInBackground() {
   persistRefreshTime();
   console.log('[PAYBACK] Background-Refresh gestartet');
 
-  // Shops (no login required) – open immediately
+  // Shops (no login required) – open both pages:
+  // alle-shops = vollständige Liste mit partnerShortName im data-tracking
+  // online-punkten = Übersichtsseite enthält auch /partner/-Shops wie Otto
   openRefreshTab('https://www.payback.at/online-punkten/alle-shops');
+  openRefreshTab('https://www.payback.at/online-punkten');
 
   // Coupons – staggered via alarm (setTimeout is unreliable in MV3 service workers)
   chrome.alarms.create(ALARM_COUPONS, { delayInMinutes: 0.033 }); // ~2 seconds
@@ -76,6 +83,13 @@ chrome.alarms.onAlarm.addListener(alarm => {
   } else if (alarm.name.startsWith(ALARM_CLEANUP_PREFIX)) {
     const tabId = parseInt(alarm.name.slice(ALARM_CLEANUP_PREFIX.length), 10);
     if (tabId) closeRefreshTab(tabId);
+  } else if (alarm.name.startsWith(ALARM_ACTIVATION_PREFIX)) {
+    // Fallback: Aktivierungs-Tab nach 2 Minuten zwangsweise schließen
+    const tabId = parseInt(alarm.name.slice(ALARM_ACTIVATION_PREFIX.length), 10);
+    if (tabId) {
+      activationTabIds.delete(tabId);
+      chrome.tabs.remove(tabId).catch(() => {});
+    }
   }
 });
 
@@ -91,6 +105,8 @@ function closeRefreshTab(tabId) {
 // Works for tabs opened by refreshInBackground() AND by the popup's refresh button.
 function autoCloseTab(tab) {
   if (!tab?.id) return;
+  // Aktivierungs-Tabs NICHT früh schließen – warten auf PENDING_ACTIVATIONS_DONE
+  if (activationTabIds.has(tab.id)) return;
   // If tracked by refreshInBackground, use that path
   if (refreshTabIds.has(tab.id)) {
     closeRefreshTab(tab.id);
@@ -208,8 +224,15 @@ function matchShop(hostname, shops) {
 
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (msg.type === 'SHOPS_DATA') {
-    chrome.storage.local.set({ shops: msg.data, shopsLastFetch: Date.now() });
-    console.log(`[PAYBACK] ${msg.data.length} Shops gespeichert`);
+    // Beim Speichern der alle-shops Daten: bestehende Partner-Shops (isPartnerPage: true)
+    // erhalten, die nicht in der neuen Liste enthalten sind (z.B. Otto von /partner/).
+    chrome.storage.local.get(['shops'], ({ shops: existing = [] }) => {
+      const newPartners = new Set(msg.data.map(s => s.partnerShortName));
+      const preserved = existing.filter(s => s.isPartnerPage && !newPartners.has(s.partnerShortName));
+      const merged = [...msg.data, ...preserved];
+      chrome.storage.local.set({ shops: merged, shopsLastFetch: Date.now() });
+      console.log(`[PAYBACK] ${msg.data.length} Shops gespeichert` + (preserved.length ? `, ${preserved.length} Partner-Shop(s) erhalten` : ''));
+    });
     if (sender.tab?.id) autoCloseTab(sender.tab);
 
   } else if (msg.type === 'OPEN_SHOP_URL') {
@@ -226,6 +249,11 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
     }
 
   } else if (msg.type === 'COUPONS_DATA') {
+    // Aktivierungs-Tabs ignorieren: die extrahierten Daten sind stale (DOM zeigt
+    // aktivierte Coupons noch als inaktiv). COUPON_ACTIVATED Nachrichten übernehmen
+    // die Aktualisierung. So wird auch kein unnötiger Popup-Reload ausgelöst.
+    if (activationTabIds.has(sender.tab?.id)) return;
+
     // Not logged in: keep cached coupons (still useful for display) but
     // always mark as logged out so popup/overlay show a login warning.
     if (!msg.loggedIn) {
@@ -260,6 +288,50 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
       });
     });
     if (sender.tab?.id) autoCloseTab(sender.tab);
+
+  } else if (msg.type === 'PARTNER_SHOPS_DATA') {
+    // Partner-Shops von /online-punkten Übersichtsseite (z.B. Otto)
+    // Werden nur hinzugefügt wenn noch kein Eintrag mit gleichem partnerShortName existiert.
+    chrome.storage.local.get(['shops'], ({ shops = [] }) => {
+      const existingPartners = new Set(shops.map(s => s.partnerShortName));
+      const newShops = msg.data.filter(s => !existingPartners.has(s.partnerShortName));
+      if (newShops.length > 0) {
+        chrome.storage.local.set({ shops: [...shops, ...newShops], shopsLastFetch: Date.now() });
+        console.log(`[PAYBACK] ${newShops.length} Partner-Shop(s) ergänzt (${newShops.map(s => s.name).join(', ')})`);
+        // Badge nach Storage-Update aktualisieren
+        chrome.tabs.query({ active: true, currentWindow: true }, async tabs => {
+          if (tabs[0]?.url) await updateBadge(tabs[0].id, tabs[0].url);
+        });
+      }
+    });
+    if (sender.tab?.id) autoCloseTab(sender.tab);
+
+  } else if (msg.type === 'ACTIVATE_ALL_COUPONS') {
+    // Alle angegebenen Coupons im Hintergrund aktivieren.
+    // WICHTIG: Tab wird NICHT in refreshTabIds eingetragen und autoCloseTab() überspringt ihn.
+    // Er bleibt offen bis PENDING_ACTIVATIONS_DONE empfangen wird (oder 2min Fallback-Alarm).
+    const coupons = msg.coupons || [];
+    if (coupons.length === 0) return;
+    chrome.storage.local.set({ pendingActivations: coupons }, () => {
+      chrome.tabs.create({ url: 'https://www.payback.at/coupons', active: false }, tab => {
+        if (tab?.id) {
+          activationTabIds.add(tab.id);
+          // 2-Minuten Fallback falls PENDING_ACTIVATIONS_DONE nie ankommt
+          chrome.alarms.create(`${ALARM_ACTIVATION_PREFIX}${tab.id}`, { delayInMinutes: 2 });
+        }
+      });
+      console.log(`[PAYBACK] ${coupons.length} Coupon(s) zur Hintergrund-Aktivierung vorgemerkt`);
+    });
+
+  } else if (msg.type === 'PENDING_ACTIVATIONS_DONE') {
+    // Content-Script hat alle Aktivierungen abgeschlossen – Tab jetzt schließen
+    if (sender.tab?.id) {
+      const tabId = sender.tab.id;
+      activationTabIds.delete(tabId);
+      chrome.alarms.clear(`${ALARM_ACTIVATION_PREFIX}${tabId}`);
+      chrome.tabs.remove(tabId).catch(() => {});
+      console.log(`[PAYBACK] Aktivierungs-Tab ${tabId} geschlossen`);
+    }
 
   } else if (msg.type === 'COUPON_ACTIVATED') {
     // Intercepted activation XHR – mark the coupon as activated in storage.

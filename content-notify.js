@@ -200,6 +200,16 @@
 
       if (unactivated.length > 0) {
         couponHtml += `<div style="font-size:11px;font-weight:bold;color:#E87722;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Nicht aktivierte eCoupons</div>`;
+        // "Alle aktivieren" Button – schickt Aktivierungsauftrag an Background
+        const activatableList = unactivated.filter(c => !c.validTo || new Date(c.validTo).getTime() > Date.now());
+        if (activatableList.length > 0) {
+          couponHtml += `
+            <button id="pb-activate-all-btn" style="
+              display:block;width:100%;margin-bottom:10px;padding:8px 12px;
+              background:#E87722;color:white;border:none;border-radius:6px;
+              font-size:13px;font-weight:bold;cursor:pointer;text-align:center;
+            ">⚡ Alle ${activatableList.length > 1 ? activatableList.length + ' eCoupons' : 'eCoupons'} automatisch aktivieren</button>`;
+        }
         unactivated.forEach(c => {
           const validTo    = formatDate(c.validTo);
           const filterUrl  = `https://www.payback.at/coupons#pbf~${encodeURIComponent(c.partnerShortName)}`;
@@ -210,7 +220,7 @@
               ${c.subline ? `<div style="color:#444;font-size:12px;margin-top:2px;">${esc(c.subline)}</div>` : ''}
               ${validTo   ? `<div style="color:#888;font-size:11px;margin-top:4px;">Gültig bis ${validTo}</div>` : ''}
               ${!isExpired
-                ? `<a href="${filterUrl}" target="_blank" style="display:inline-block;margin-top:8px;background:#E87722;color:white;padding:5px 12px;border-radius:5px;text-decoration:none;font-size:12px;font-weight:bold;">Jetzt aktivieren →</a>`
+                ? `<a href="${filterUrl}" target="_blank" style="display:inline-block;margin-top:8px;background:#E87722;color:white;padding:5px 12px;border-radius:5px;text-decoration:none;font-size:12px;font-weight:bold;">Auf payback.at ansehen →</a>`
                 : `<div style="color:#888;font-size:11px;margin-top:6px;">⏰ Aktivierungszeitraum abgelaufen</div>`
               }
             </div>`;
@@ -278,6 +288,20 @@
       setTimeout(() => { widget.remove(); _currentWidget = null; showToggle(shop); }, 200);
       chrome.storage.local.set({ [dismissKey]: true });
     });
+
+    const activateAllBtn = document.getElementById('pb-activate-all-btn');
+    if (activateAllBtn) {
+      activateAllBtn.addEventListener('click', () => {
+        const toActivate = _latestCoupons
+          .filter(c => !c.activated && (!c.validTo || new Date(c.validTo).getTime() > Date.now()))
+          .map(c => ({ couponId: c.couponID, partnerShortName: c.partnerShortName }));
+        if (toActivate.length === 0) return;
+        chrome.runtime.sendMessage({ type: 'ACTIVATE_ALL_COUPONS', coupons: toActivate });
+        activateAllBtn.textContent = '⚡ Wird aktiviert…';
+        activateAllBtn.disabled = true;
+        activateAllBtn.style.opacity = '0.7';
+      });
+    }
   }
 
   function buildWarnings() {

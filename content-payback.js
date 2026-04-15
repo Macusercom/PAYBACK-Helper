@@ -19,11 +19,17 @@
 
   if (path === '/online-punkten/alle-shops') {
     extractShops();
+  } else if (path === '/online-punkten' || path === '/online-punkten/') {
+    // Übersichtsseite: enthält auch /partner/-Shops (z.B. Otto), die nicht in alle-shops sind
+    extractPartnerShops();
   } else if (path === '/coupons') {
     extractCoupons();
     handlePartnerFilterFromHash();
   } else if (path.startsWith('/online-punkten/') && path.length > '/online-punkten/'.length) {
     // Individual shop page (z.B. /online-punkten/austrian-airlines)
+    handleShopAutoClick();
+  } else if (path.startsWith('/partner/') && path.length > '/partner/'.length) {
+    // Partner-Seite (z.B. /partner/otto) – anderes Layout, kein #shopNowForm
     handleShopAutoClick();
   }
 
@@ -35,10 +41,17 @@
     const el = document.querySelector('.pb-navigation__member-text');
     if (!el) return;
     const text = el.textContent.trim(); // e.g. "9 191 °P"
-    // Extract numeric part: remove "°P", non-breaking spaces, regular spaces → parse as int
-    const numStr = text.replace(/°P/g, '').replace(/\s/g, '').trim();
+
+    // Kein °P sichtbar (leerer Text bei schwacher Sitzung / PIN erforderlich) →
+    // gecachten Wert NICHT überschreiben.
+    if (!text || !text.includes('°P')) return;
+
+    // Numerischen Teil extrahieren: °P, geschützte Leerzeichen (\u00A0), normale Leerzeichen entfernen
+    const numStr = text.replace(/°P/g, '').replace(/[\s\u00A0]/g, '').trim();
     const points = parseInt(numStr, 10);
-    if (!isNaN(points) && points >= 0) {
+
+    // Nur speichern wenn ein sinnvoller Wert (> 0) vorhanden ist
+    if (!isNaN(points) && points > 0) {
       chrome.storage.local.set({
         pointsBalance: points,
         pointsLastFetch: Date.now(),
@@ -80,6 +93,57 @@
 
     chrome.runtime.sendMessage({ type: 'SHOPS_DATA', data: shops });
     showBanner(`${shops.length} Shops aktualisiert ✓`);
+  }
+
+  // ----------------------------------------------------------
+  // Partner-Shop-Extraktion (von /online-punkten Übersicht)
+  // Erfasst Shops die nur unter /partner/ verlinkt sind (z.B. Otto),
+  // nicht unter /online-punkten/ und daher nicht in alle-shops.
+  // partnerShortName wird aus dem Logo-Dateinamen extrahiert:
+  //   z.B. otto_at_4008.png → otto_at
+  // ----------------------------------------------------------
+  function extractPartnerShops() {
+    const shops = [];
+    const seen = new Set();
+
+    document.querySelectorAll('a[href^="/partner/"]').forEach(a => {
+      const href = a.getAttribute('href') || '';
+      const slug = href.replace('/partner/', '').trim();
+      if (!slug || seen.has(slug)) return;
+      seen.add(slug);
+
+      // partnerShortName aus Logo-Dateiname ableiten (data-src-l="otto_at_4008.png" → "otto_at")
+      const img = a.querySelector('img[data-src-l]');
+      const dataSrcL = img?.getAttribute('data-src-l') || '';
+      const partnerShortName = dataSrcL.replace(/_\d+(?:_2x)?\.(?:png|svg|jpg)$/i, '').trim();
+      if (!partnerShortName) return;
+
+      // Shop-Name aus title-Attribut extrahieren (z.B. "Zum OTTO Shop" → "OTTO")
+      const title = a.getAttribute('title') || '';
+      let name = title
+        .replace(/^Zu[mr]?\s+/i, '')
+        .replace(/\s+(?:PAYBACK\s+)?(?:Partner\s+)?(?:PAYBACK\s+)?Shop$/i, '')
+        .trim();
+      if (!name) name = slug;
+
+      const pointsEl = a.querySelector('.pb-tile__highlight-title, .pb-tile__highlight span');
+      const points = pointsEl?.textContent.trim() || '';
+
+      shops.push({
+        slug,
+        name,
+        points,
+        partnerShortName,
+        // #pb-autoclick löst handleShopAutoClick() aus (sucht "Zum Online Shop" Link)
+        paybackUrl: `https://www.payback.at${href}#pb-autoclick`,
+        isPartnerPage: true, // Marker: nicht in alle-shops, daher beim SHOPS_DATA-Merge erhalten
+      });
+    });
+
+    if (shops.length > 0) {
+      chrome.runtime.sendMessage({ type: 'PARTNER_SHOPS_DATA', data: shops });
+      console.log(`[PAYBACK] ${shops.length} Partner-Shops aus Übersichtsseite gefunden`);
+    }
   }
 
   // ----------------------------------------------------------
@@ -152,6 +216,7 @@
     // mark the coupon as activated in chrome.storage.
     if (isInitialLoad) {
       interceptActivationRequests();
+      executePendingActivations();
     }
   }
 
@@ -264,6 +329,20 @@
         }
       }
 
+      // Fallback 2: direkter "Zum Online Shop" Link auf /partner/-Seiten
+      // (z.B. /partner/otto – hat keinen #shopNowForm, nur einen <a>-Link)
+      const shopLink = document.querySelector('a[title="Zum Online Shop"]')
+                    || document.querySelector('.pb-panorama-strap__button-wrapper a[href^="https://"]');
+      if (shopLink) {
+        const shopLinkUrl = shopLink.getAttribute('href');
+        if (shopLinkUrl && shopLinkUrl.startsWith('http') && !shopLinkUrl.includes('payback.at')) {
+          console.log('[PAYBACK] Fallback partner-shopLink gefunden:', shopLinkUrl.substring(0, 60));
+          showBanner('Weiterleitung aktiv ✓');
+          window.location.href = shopLinkUrl;
+          return;
+        }
+      }
+
       if (attempt < 20) {
         setTimeout(() => doRedirect(attempt + 1), 400);
       } else {
@@ -293,6 +372,75 @@
         partnerShortName: partnerShortName || null,
       });
     });
+  }
+
+  // ----------------------------------------------------------
+  // Hintergrund-Aktivierung ausstehender eCoupons
+  // Wird auf /coupons aufgerufen. Liest pendingActivations aus Storage,
+  // extrahiert die Sitzungs-Token direkt aus dem Seiten-Script (PB.config)
+  // und schickt für jeden Coupon einen POST an ?:action=CapiProxy.
+  // ----------------------------------------------------------
+  async function executePendingActivations() {
+    const { pendingActivations } = await chrome.storage.local.get(['pendingActivations']);
+    if (!Array.isArray(pendingActivations) || pendingActivations.length === 0) return;
+
+    // Identity-Token aus PB.config im Seiten-HTML extrahieren:
+    // "identity":{"salt":"<identityKey>","hash":"<identityValue>"}
+    let identityKey = '', identityValue = '';
+    for (const script of document.querySelectorAll('script:not([src])')) {
+      const m = script.textContent.match(/"identity"\s*:\s*\{\s*"salt"\s*:\s*"([^"]+)"\s*,\s*"hash"\s*:\s*"([^"]+)"/);
+      if (m) { identityKey = m[1]; identityValue = m[2]; break; }
+    }
+
+    if (!identityKey || !identityValue) {
+      console.log('[PAYBACK] Identity-Token nicht gefunden – Aktivierung abgebrochen');
+      return;
+    }
+
+    // Sofort aus Storage entfernen um Doppelausführung zu verhindern
+    await chrome.storage.local.remove('pendingActivations');
+    console.log('[PAYBACK] Aktiviere', pendingActivations.length, 'Coupon(s) im Hintergrund…');
+
+    let successCount = 0;
+    for (const { couponId, partnerShortName } of pendingActivations) {
+      try {
+        const body = new URLSearchParams({
+          'capiCallData[couponId]': String(couponId),
+          'capiCallData[partnerShortName]': partnerShortName,
+          'capiCallData[ExtintServiceName]': 'activateCoupon',
+          identityValue,
+          identityKey,
+        });
+
+        const resp = await fetch('https://www.payback.at/?:action=CapiProxy', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: body.toString(),
+          credentials: 'include',
+        });
+
+        if (resp.ok) {
+          chrome.runtime.sendMessage({
+            type: 'COUPON_ACTIVATED',
+            couponId: String(couponId),
+            partnerShortName: partnerShortName || null,
+          });
+          successCount++;
+          console.log('[PAYBACK] Coupon', couponId, '(', partnerShortName, ') aktiviert ✓');
+        } else {
+          console.log('[PAYBACK] Coupon', couponId, 'Fehler:', resp.status);
+        }
+      } catch (e) {
+        console.log('[PAYBACK] Coupon', couponId, 'Exception:', e.message);
+      }
+    }
+
+    showBanner(`${successCount} von ${pendingActivations.length} eCoupon(s) aktiviert ✓`);
+    // Tab-Schließ-Signal: Background wartet auf diese Nachricht
+    chrome.runtime.sendMessage({ type: 'PENDING_ACTIVATIONS_DONE' });
   }
 
   function scrollToNotActivated() {

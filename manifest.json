@@ -20,7 +20,9 @@
     },
     {
       "matches": [
+        "https://www.payback.at/online-punkten",
         "https://www.payback.at/online-punkten/*",
+        "https://www.payback.at/partner/*",
         "https://www.payback.at/coupons*"
       ],
       "js": ["content-payback.js"],
