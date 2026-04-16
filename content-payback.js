@@ -186,11 +186,12 @@
         const isActivated = coupon.couponStatus === 2
                          || !!el.closest('.pb-coupon-center__columns-activated');
 
-        // data-activateable is unreliable (can be false for activatable coupons).
-        // Use expiry date instead: if validTo is in the future, it's activatable.
-        const validTo = coupon.validity?.validTo;
-        const isExpired = validTo ? new Date(validTo).getTime() < Date.now() : false;
-        const isActivatable = !isActivated && !isExpired;
+        const validFrom = coupon.validity?.validFrom || '';
+        const validTo   = coupon.validity?.validTo   || '';
+        const now       = Date.now();
+        const isExpired   = validTo   ? new Date(validTo).getTime()   < now : false;
+        const isComingSoon = !isActivated && validFrom && new Date(validFrom).getTime() > now;
+        const isActivatable = !isActivated && !isExpired && !isComingSoon;
 
         coupons.push({
           couponID:          coupon.couponID,
@@ -199,9 +200,11 @@
           headline:          getText(5),
           subline:           getText(6),
           shopUrl:           getText(13),
-          validTo:           coupon.validity?.validTo || '',
+          validFrom,
+          validTo,
           activated:         isActivated,
           activatable:       isActivatable,
+          comingSoon:        !!isComingSoon,
         });
       } catch {}
     });

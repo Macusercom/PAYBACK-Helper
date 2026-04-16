@@ -88,7 +88,7 @@
         showOverlay(_currentShop, _latestCoupons);
       } else if (_toggleBtn && document.body.contains(_toggleBtn)) {
         // Only toggle button visible – update color and store fresh coupons for re-show
-        const unactivated = _latestCoupons.filter(c => !c.activated);
+        const unactivated = _latestCoupons.filter(c => !c.activated && !c.comingSoon);
         const activated   = _latestCoupons.filter(c => c.activated);
         _toggleBtn.style.background = unactivated.length > 0 ? '#E87722'
                                     : activated.length > 0   ? '#2E7D32'
@@ -139,7 +139,7 @@
 
   function showToggle(shop) {
     if (_toggleBtn) return;
-    const unactivated = _latestCoupons.filter(c => !c.activated);
+    const unactivated = _latestCoupons.filter(c => !c.activated && !c.comingSoon);
     const activated   = _latestCoupons.filter(c => c.activated);
     const btnColor = unactivated.length > 0 ? '#E87722'
                    : activated.length > 0   ? '#2E7D32'
@@ -168,8 +168,9 @@
   // Overlay-Widget
   // ----------------------------------------------------------
   function showOverlay(shop, coupons) {
-    const unactivated = coupons.filter(c => !c.activated);
-    const activated   = coupons.filter(c => c.activated);
+    const comingSoon  = coupons.filter(c =>  c.comingSoon);
+    const unactivated = coupons.filter(c => !c.activated && !c.comingSoon);
+    const activated   = coupons.filter(c =>  c.activated);
     const hasCoupons  = coupons.length > 0;
 
     const accentColor = unactivated.length > 0 ? '#E87722'
@@ -200,16 +201,12 @@
 
       if (unactivated.length > 0) {
         couponHtml += `<div style="font-size:11px;font-weight:bold;color:#E87722;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Nicht aktivierte eCoupons</div>`;
-        // "Alle aktivieren" Button – schickt Aktivierungsauftrag an Background
-        const activatableList = unactivated.filter(c => !c.validTo || new Date(c.validTo).getTime() > Date.now());
-        if (activatableList.length > 0) {
-          couponHtml += `
-            <button id="pb-activate-all-btn" style="
-              display:block;width:100%;margin-bottom:10px;padding:8px 12px;
-              background:#E87722;color:white;border:none;border-radius:6px;
-              font-size:13px;font-weight:bold;cursor:pointer;text-align:center;
-            ">⚡ Alle ${activatableList.length > 1 ? activatableList.length + ' eCoupons' : 'eCoupons'} automatisch aktivieren</button>`;
-        }
+        couponHtml += `
+          <button id="pb-activate-all-btn" style="
+            display:block;width:100%;margin-bottom:10px;padding:8px 12px;
+            background:#E87722;color:white;border:none;border-radius:6px;
+            font-size:13px;font-weight:bold;cursor:pointer;text-align:center;
+          ">⚡ Alle ${unactivated.length > 1 ? unactivated.length + ' eCoupons' : 'eCoupons'} automatisch aktivieren</button>`;
         unactivated.forEach(c => {
           const validTo    = formatDate(c.validTo);
           const filterUrl  = `https://www.payback.at/coupons#pbf~${encodeURIComponent(c.partnerShortName)}`;
@@ -237,6 +234,21 @@
               ${c.subline ? `<div style="color:#444;font-size:12px;margin-top:2px;">${esc(c.subline)}</div>` : ''}
               ${validTo   ? `<div style="color:#888;font-size:11px;margin-top:4px;">Gültig bis ${validTo}</div>` : ''}
               <div style="color:#2E7D32;font-size:11px;margin-top:4px;font-weight:bold;">✓ Bereits aktiviert</div>
+            </div>`;
+        });
+      }
+
+      if (comingSoon.length > 0) {
+        couponHtml += `<div style="font-size:11px;font-weight:bold;color:#3a5fa0;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;${(unactivated.length > 0 || activated.length > 0) ? 'margin-top:4px;' : ''}">In Kürze verfügbar</div>`;
+        comingSoon.forEach(c => {
+          const activeFrom = formatDate(c.validFrom);
+          const validTo    = formatDate(c.validTo);
+          couponHtml += `
+            <div style="background:#EEF2FA;border:1px solid #7A99CC;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+              <div style="font-weight:bold;color:#3a5fa0;font-size:15px;">${esc(c.headline)}</div>
+              ${c.subline ? `<div style="color:#444;font-size:12px;margin-top:2px;">${esc(c.subline)}</div>` : ''}
+              ${validTo   ? `<div style="color:#888;font-size:11px;margin-top:4px;">Gültig bis ${validTo}</div>` : ''}
+              <div style="color:#3a5fa0;font-size:11px;margin-top:4px;font-weight:bold;">🕐 Aktivierbar ab ${activeFrom}</div>
             </div>`;
         });
       }

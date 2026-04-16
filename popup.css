@@ -165,6 +165,13 @@ body {
   opacity: 0.75;
 }
 
+.coupon-card.coming-soon {
+  background: #EEF2FA;
+  border-color: #7A99CC;
+}
+
+.coupon-card.coming-soon .coupon-headline { color: #3a5fa0; }
+
 .coupon-headline {
   font-size: 15px;
   font-weight: bold;
@@ -224,6 +231,13 @@ body {
 .coupon-activated-badge {
   font-size: 11px;
   color: #2E7D32;
+  font-weight: bold;
+  margin-top: 5px;
+}
+
+.coupon-coming-soon-note {
+  font-size: 11px;
+  color: #3a5fa0;
   font-weight: bold;
   margin-top: 5px;
 }

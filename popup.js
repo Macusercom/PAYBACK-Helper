@@ -105,24 +105,25 @@ function renderCoupons(coupons, _shop, couponsLoggedIn) {
     return;
   }
 
-  const unactivated = coupons.filter(c => !c.activated);
+  const comingSoon  = coupons.filter(c =>  c.comingSoon);
+  const unactivated = coupons.filter(c => !c.activated && !c.comingSoon);
   const activated   = coupons.filter(c =>  c.activated);
   let html = '';
 
   if (unactivated.length > 0) {
     html += `<div class="coupons-header">⚠ Nicht aktivierte eCoupons</div>`;
-    // "Alle aktivieren" Button – Background öffnet payback.at/coupons und aktiviert dort
-    const activatable = unactivated.filter(c => !c.validTo || new Date(c.validTo).getTime() > Date.now());
-    if (activatable.length > 0) {
-      html += `<button class="btn-activate-all" id="btn-activate-all">
-        ⚡ Alle ${activatable.length > 1 ? activatable.length + ' eCoupons' : 'eCoupons'} automatisch aktivieren
-      </button>`;
-    }
+    html += `<button class="btn-activate-all" id="btn-activate-all">
+      ⚡ Alle ${unactivated.length > 1 ? unactivated.length + ' eCoupons' : 'eCoupons'} automatisch aktivieren
+    </button>`;
     unactivated.forEach(c => { html += buildCouponCard(c, 'unactivated'); });
   }
   if (activated.length > 0) {
     html += `<div class="coupons-header">✓ Aktivierte eCoupons</div>`;
     activated.forEach(c => { html += buildCouponCard(c, 'activated'); });
+  }
+  if (comingSoon.length > 0) {
+    html += `<div class="coupons-header">🕐 In Kürze verfügbar</div>`;
+    comingSoon.forEach(c => { html += buildCouponCard(c, 'coming-soon'); });
   }
 
   section.innerHTML = html;
@@ -132,7 +133,6 @@ function renderCoupons(coupons, _shop, couponsLoggedIn) {
   if (activateAllBtn) {
     activateAllBtn.addEventListener('click', () => {
       const toActivate = unactivated
-        .filter(c => !c.validTo || new Date(c.validTo).getTime() > Date.now())
         .map(c => ({ couponId: c.couponID, partnerShortName: c.partnerShortName }));
       if (toActivate.length === 0) return;
       chrome.runtime.sendMessage({ type: 'ACTIVATE_ALL_COUPONS', coupons: toActivate });
@@ -150,7 +150,10 @@ function buildCouponCard(coupon, type) {
   const isExpired = coupon.validTo ? new Date(coupon.validTo).getTime() < Date.now() : false;
 
   let statusHtml = '';
-  if (type === 'unactivated') {
+  if (type === 'coming-soon') {
+    const activeFrom = formatDate(coupon.validFrom);
+    statusHtml = `<div class="coupon-coming-soon-note">🕐 Aktivierbar ab ${activeFrom}</div>`;
+  } else if (type === 'unactivated') {
     if (!isExpired) {
       statusHtml = `<a href="${filterUrl}" target="_blank" class="btn-activate">Jetzt aktivieren →</a>`;
     } else {
