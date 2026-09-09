@@ -82,6 +82,8 @@ function matchShop(hostname, shops) {
     if (cleanHost.startsWith(slug + '.') || cleanHost === slug) return shop;
     const normedName = normalizeName(shop.name);
     if (normedName.length > 3 && hostParts.some(p => normalizeName(p) === normedName)) return shop;
+    const normedSlug = normalizeName(slug);
+    if (normedSlug.length > 3 && hostParts.some(p => normalizeName(p) === normedSlug)) return shop;
   }
   return null;
 }

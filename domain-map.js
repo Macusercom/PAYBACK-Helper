@@ -5,15 +5,31 @@
 // Loaded as <script> in popup.html
 // ============================================================
 //
-// Key   = normalized shop name (same normalization as Payback HTML shop title)
-//         → shopName.toLowerCase().replace(/[^a-z0-9]/g, '')
-// Value = array of domains (without www.) to match against current hostname
+// Key   = domain (without www.) to match against the current hostname
+// Value = normalized Payback shop name, i.e. normalizeName(shop.name)
 //
 // ALSO exported: normalizeName(str) helper function
+//
+// normalizeName transliteriert deutsche Umlaute (ä→ae, ö→oe, ü→ue, ß→ss),
+// bevor alles Nicht-Alphanumerische entfernt wird. Ohne diese Stufe wuerde
+// "Kärcher" zu "krcher" verstuemmelt und der Hostname-Fallback in matchShop()
+// (kaercher.com → "kaercher") koennte den Shop nie finden.
+// Wird die Funktion geaendert, muessen die Values unten mitgezogen werden --
+// sie werden nirgends persistiert, ein Storage-Reset ist also nicht noetig.
 
 function normalizeName(str) {
   if (!str) return '';
-  return str.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return str
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    // uebrige Akzente abtragen: é→e, å→a, ç→c ...
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
 }
 
 // Direct domain → normalized shop name lookup
@@ -65,7 +81,7 @@ const PAYBACK_DOMAIN_LOOKUP = {
   "bigbustours.com":         "bigbustours",
   "billiger-mietwagen.de":   "billigermietwagen",
   "biotikon.de":             "biotikon",
-  "bjornborg.com":           "bjrnborg",
+  "bjornborg.com":           "bjoernborg",
   "blue-tomato.com":         "bluetomato",
   "blutsgeschwister.de":     "blutsgeschwister",
   "boden.com":               "bodenat",
@@ -118,7 +134,7 @@ const PAYBACK_DOMAIN_LOOKUP = {
   "elv.com":                 "elv",
   "emp.at":                  "emp",
   "ernstings-family.at":     "ernstingsfamily",
-  "erwinmueller.at":         "erwinmller",
+  "erwinmueller.at":         "erwinmueller",
   "euroflorist.at":          "euroflorist",
   "everdrop.at":             "everdrop",
   "expert.at":               "expert",
@@ -145,7 +161,7 @@ const PAYBACK_DOMAIN_LOOKUP = {
   "hotels.com":              "hotelscom",
   "hrs.com":                 "hrs",
   "hse.com":                 "hse24",
-  "hunkemoller.at":          "hunkemller",
+  "hunkemoller.at":          "hunkemoeller",
   "irobot.at":               "irobot",
   "jack-wolfskin.at":        "jackwolfskin",
   "jako.com":                "jako",
@@ -161,7 +177,7 @@ const PAYBACK_DOMAIN_LOOKUP = {
   "kinguin.net":             "kinguin",
   "krups.at":                "krups",
   "kytary.at":               "kytary",
-  "kaercher.com":            "krcher",
+  "kaercher.com":            "kaercher",
   "ltur.com":                "ltur",
   "landal.com":              "landalgreenparks",
   "lascana.at":              "lascana",
@@ -203,7 +219,7 @@ const PAYBACK_DOMAIN_LOOKUP = {
   "nici.de":                 "nici",
   "nike.com":                "nike",
   "nike.at":                 "nike",
-  "ninjakitchen.at":         "ninjakitchen",
+  "ninjakitchen.at":         "sharkninja",                 // ehem. "Ninja Kitchen" -> SharkNinja
   "nordpass.com":            "nordpass",
   "nordvpn.com":             "nordvpn",
   "notino.at":               "notino",
@@ -247,7 +263,7 @@ const PAYBACK_DOMAIN_LOOKUP = {
   "seidensticker.com":       "seidensticker",
   "sensilab.at":             "sensilab",
   "sephora.at":              "sephora",
-  "sharkclean.eu":           "sharkclean",
+  "sharkclean.eu":           "sharkninja",                 // ehem. "Shark Clean" -> SharkNinja
   "shirtinator.at":          "shirtinator",
   "shoe4you.com":            "shoe4you",
   "shop4runners.com":        "shop4runners",
@@ -316,8 +332,8 @@ const PAYBACK_DOMAIN_LOOKUP = {
   "babywalz.de":             "babywalz",
   "bitpanda.com":            "bitpanda",
   "bonprix.at":              "bonprix",
-  "bosch-home.at":           "boschhausgerte",             // Payback: "Bosch Hausgeräte"
-  "bosch-home.com":          "boschhausgerte",
+  "bosch-home.at":           "boschhausgeraete",             // Payback: "Bosch Hausgeräte"
+  "bosch-home.com":          "boschhausgeraete",
   "buttinette.com":          "buttinette",
   "channel21.de":            "channel21",
   "check24.at":              "check24",
@@ -346,7 +362,7 @@ const PAYBACK_DOMAIN_LOOKUP = {
   "lensbest.at":             "lensbest",
   "lensbest.de":             "lensbest",
   "lieferando.at":           "lieferandoat",
-  "moemax.at":               "mmax",
+  "moemax.at":               "moemax",
   "n26.com":                 "n26",
   "nkd.com":                 "nkd",
   "notebooksbilliger.de":    "notebooksbilligerde",
@@ -382,14 +398,14 @@ const PAYBACK_DOMAIN_LOOKUP = {
   "running-point.at":        "runningpointat",
   "scalable.capital":        "scalablecapital",
   "de.scalable.capital":     "scalablecapital",
-  "schaefer-shop.at":        "schfer",                     // Payback: "Schäfer"
+  "schaefer-shop.at":        "schaefer",                     // Payback: "Schäfer"
   "sixt.at":                 "sixt",
   "sixt.de":                 "sixt",
   "takko.com":               "takko",
   "tfbank.at":               "tfbank",
   "tui.at":                  "tui",
   "tui.com":                 "tui",
-  "universal.at":            "universalversandsterreich",  // Payback: "Universal Versand Österreich"
+  "universal.at":            "universalversandoesterreich",  // Payback: "Universal Versand Österreich"
   "vikingdirekt.at":         "viking",
   "walbusch.at":             "walbusch",
   "weloveholidays.at":       "weloveholidays",
@@ -399,4 +415,28 @@ const PAYBACK_DOMAIN_LOOKUP = {
   "yves-rocher.at":          "yvesrocher",
   "zalando-lounge.at":       "zalandolounge",
   "zooplus.at":              "zooplus",
+
+  // ---- Neue Partner (Stand 09.09.2026) ----
+  "bergfreunde.at":          "bergfreunde",
+  "bergfreunde.de":          "bergfreunde",
+  "cfab.com":                "cfabbycreamyfabrics",        // Payback: "cfab by creamy fabrics"
+  "creamyfabrics.com":       "cfabbycreamyfabrics",
+  "eurowings.com":           "eurowings",
+  "eurowings-holidays.com":  "eurowingsholiday",           // Payback: "Eurowings Holiday" (ohne s)
+  "freitag.ch":              "freitag",
+  "gigasport.at":            "gigasport",
+  "goldentree.de":           "goldentree",
+  "grimaldi-lines.com":      "grimaldilines",
+  "weareholy.com":           "holy",
+  "huawei.com":              "huawei",
+  "kastner-oehler.at":       "kastneroehler",              // Payback: "Kastner & Öhler"
+  "matratzen-concord.at":    "matratzenconcord",
+  "naturtreu.de":            "naturtreu",
+  "newbalance.at":           "newbalance",
+  "newbalance.de":           "newbalance",
+  "prioritypass.com":        "prioritypass",
+  "sharkninja.com":          "sharkninja",
+  "tchibo.at":               "tchibo",
+  "turbopass.com":           "turbopass",
+  "zenhotels.com":           "zenhotels",
 };
