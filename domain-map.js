@@ -275,7 +275,6 @@ const PAYBACK_DOMAIN_LOOKUP = {
   "sonos.com":               "sonos",
   "sony.at":                 "sony",
   "sony.com":                "sony",
-  "soundcore.com":           "soundcore",
   "sport-thieme.at":         "sportthieme",
   "sportscheck.at":          "sportscheck",
   "sportwerk.com":           "sportwerk",
