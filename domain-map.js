@@ -439,4 +439,11 @@ const PAYBACK_DOMAIN_LOOKUP = {
   "tchibo.at":               "tchibo",
   "turbopass.com":           "turbopass",
   "zenhotels.com":           "zenhotels",
+
+  // ---- Neue Partner (Stand 28.09.2026) ----
+  // Payback listet Anker (Powerbanks/Ladegeraete) neu; die Audio-Submarke
+  // "Soundcore" ist aus der Partnerliste verschwunden. soundcore.com bleibt
+  // bewusst unverknuepft -- die Partnerseite nennt keine Submarken, eine
+  // Umleitung auf Anker waere geraten und koennte ein falsches °P-Badge zeigen.
+  "anker.com":               "anker",
 };
