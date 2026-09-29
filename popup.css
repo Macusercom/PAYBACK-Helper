@@ -328,6 +328,10 @@ body {
   user-select: none;
 }
 
+.overlay-toggle + .overlay-toggle {
+  padding-top: 0;
+}
+
 .overlay-toggle input[type="checkbox"] {
   width: 14px;
   height: 14px;

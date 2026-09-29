@@ -220,6 +220,43 @@ function matchShop(hostname, shops) {
   return null;
 }
 
+// ---- eCoupon-Aktivierung im Hintergrund ----
+
+// Alle angegebenen Coupons im Hintergrund aktivieren.
+// WICHTIG: Tab wird NICHT in refreshTabIds eingetragen und autoCloseTab() überspringt ihn.
+// Er bleibt offen bis PENDING_ACTIVATIONS_DONE empfangen wird (oder 2min Fallback-Alarm).
+function activateInBackground(coupons) {
+  if (coupons.length === 0) return;
+  chrome.storage.local.set({ pendingActivations: coupons }, () => {
+    chrome.tabs.create({ url: 'https://www.payback.at/coupons', active: false }, tab => {
+      if (tab?.id) {
+        activationTabIds.add(tab.id);
+        // 2-Minuten Fallback falls PENDING_ACTIVATIONS_DONE nie ankommt
+        chrome.alarms.create(`${ALARM_ACTIVATION_PREFIX}${tab.id}`, { delayInMinutes: 2 });
+      }
+    });
+    console.log(`[PAYBACK] ${coupons.length} Coupon(s) zur Hintergrund-Aktivierung vorgemerkt`);
+  });
+}
+
+// Option "eCoupons automatisch aktivieren" (Popup, default: aus).
+// Läuft nach jedem frischen Coupon-Abruf mit den gerade extrahierten Daten –
+// nicht mit dem Storage-Cache, der Coupons anderer Partner veraltet enthalten kann.
+// Aktivierungs-Tabs lösen das nie aus: ihr COUPONS_DATA wird vorher verworfen.
+async function autoActivateCoupons(freshCoupons) {
+  const { autoActivateCoupons: enabled } = await chrome.storage.local.get(['autoActivateCoupons']);
+  if (enabled !== true) return;
+  // Läuft bereits eine Aktivierung, würde pendingActivations überschrieben
+  if (activationTabIds.size > 0) return;
+  const toActivate = freshCoupons
+    .filter(c => c.activatable)
+    .map(c => ({ couponId: c.couponID, partnerShortName: c.partnerShortName }));
+  if (toActivate.length > 0) {
+    console.log(`[PAYBACK] Auto-Aktivierung: ${toActivate.length} eCoupon(s)`);
+    activateInBackground(toActivate);
+  }
+}
+
 // ---- Messages from content scripts + popup ----
 
 chrome.runtime.onMessage.addListener((msg, sender) => {
@@ -287,6 +324,7 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
         if (tabs[0]?.url) await updateBadge(tabs[0].id, tabs[0].url);
       });
     });
+    autoActivateCoupons(msg.data);
     if (sender.tab?.id) autoCloseTab(sender.tab);
 
   } else if (msg.type === 'PARTNER_SHOPS_DATA') {
@@ -307,21 +345,7 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
     if (sender.tab?.id) autoCloseTab(sender.tab);
 
   } else if (msg.type === 'ACTIVATE_ALL_COUPONS') {
-    // Alle angegebenen Coupons im Hintergrund aktivieren.
-    // WICHTIG: Tab wird NICHT in refreshTabIds eingetragen und autoCloseTab() überspringt ihn.
-    // Er bleibt offen bis PENDING_ACTIVATIONS_DONE empfangen wird (oder 2min Fallback-Alarm).
-    const coupons = msg.coupons || [];
-    if (coupons.length === 0) return;
-    chrome.storage.local.set({ pendingActivations: coupons }, () => {
-      chrome.tabs.create({ url: 'https://www.payback.at/coupons', active: false }, tab => {
-        if (tab?.id) {
-          activationTabIds.add(tab.id);
-          // 2-Minuten Fallback falls PENDING_ACTIVATIONS_DONE nie ankommt
-          chrome.alarms.create(`${ALARM_ACTIVATION_PREFIX}${tab.id}`, { delayInMinutes: 2 });
-        }
-      });
-      console.log(`[PAYBACK] ${coupons.length} Coupon(s) zur Hintergrund-Aktivierung vorgemerkt`);
-    });
+    activateInBackground(msg.coupons || []);
 
   } else if (msg.type === 'PENDING_ACTIVATIONS_DONE') {
     // Content-Script hat alle Aktivierungen abgeschlossen – Tab jetzt schließen

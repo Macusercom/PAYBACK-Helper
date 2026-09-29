@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       buildFooter(shopsLastFetch, couponsLastFetch, couponsLoggedIn);
     setupRefreshButton();
     setupOverlayToggle();
+    setupAutoActivateToggle();
     return;
   }
 
@@ -55,6 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     buildFooter(shopsLastFetch, couponsLastFetch, couponsLoggedIn);
   setupRefreshButton();
   setupOverlayToggle();
+  setupAutoActivateToggle();
 });
 
 // ---- Domain matching (same logic as background.js) ----
@@ -196,6 +198,10 @@ function buildFooter(shopsLastFetch, couponsLastFetch, couponsLoggedIn) {
       <input type="checkbox" class="chk-overlay">
       <span>°P Overlay auf Websites anzeigen</span>
     </label>
+    <label class="overlay-toggle">
+      <input type="checkbox" class="chk-auto-activate">
+      <span>eCoupons automatisch aktivieren</span>
+    </label>
     <div class="footer-timestamps ${staleClass}">
       Shops: ${shopsAge} · Coupons: ${couponStatus}
     </div>
@@ -232,6 +238,23 @@ function setupOverlayToggle() {
   });
   chk.addEventListener('change', () => {
     chrome.storage.local.set({ overlayEnabled: chk.checked });
+  });
+}
+
+function setupAutoActivateToggle() {
+  const chk = document.querySelector('.chk-auto-activate');
+  if (!chk) return;
+  // Default: aus – aktiviert eCoupons im PAYBACK-Konto ohne Rückfrage
+  chrome.storage.local.get(['autoActivateCoupons'], ({ autoActivateCoupons }) => {
+    chk.checked = autoActivateCoupons === true;
+  });
+  chk.addEventListener('change', () => {
+    chrome.storage.local.set({ autoActivateCoupons: chk.checked });
+    // Sofort wirksam statt erst beim nächsten Refresh: frische Coupon-Seite
+    // laden, deren COUPONS_DATA löst im Background die Aktivierung aus.
+    if (chk.checked) {
+      chrome.tabs.create({ url: 'https://www.payback.at/coupons', active: false });
+    }
   });
 }
 
